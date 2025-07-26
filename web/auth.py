@@ -23,5 +23,4 @@ async def kakao_callback(code: str = Query(...)):
         token = await auth.login_or_signup_kakao(code)
     except Exception as e:
         raise HTTPException(400, f"Kakao OAuth failed: {e}")
-    # 테스트용으로 JSON 반환
-    return { "access_token": token, "token_type": "bearer" }
+    return token
