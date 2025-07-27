@@ -1,22 +1,27 @@
-import os
-import uvicorn
-from fastapi import FastAPI, Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-app = FastAPI()
-class DynamicCORSMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response: Response = await call_next(request)
-        origin = request.headers.get("origin")
-        if origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Authorization,Content-Type"
-        return response
+from dotenv import load_dotenv
+load_dotenv()
 
-app.add_middleware(DynamicCORSMiddleware)
-app.add_middleware(SessionMiddleware, secret_key=os.environ["SESSION_SECRET_KEY"])
+import uvicorn
+from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
+import os
+from starlette.middleware.sessions import SessionMiddleware
+from web import auth
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.add_middleware(SessionMiddleware, session_cookie="cookie", same_site="none", https_only=True, secret_key=os.environ["SESSION_SECRET_KEY"])
+
+app.include_router(auth.router)
 
 if __name__ == '__main__':
     uvicorn.run('main:app', port=8000, reload=True)
