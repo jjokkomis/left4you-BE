@@ -17,7 +17,7 @@ oauth2_scheme = OAuth2PasswordBearer(
     scheme_name="JWT"
 )
 
-def create_access_token(payload: dict, expires_delta: timedelta = timedelta(minutes=1)):
+def create_access_token(payload: dict, expires_delta: timedelta = timedelta(minutes=60)):
     to_encode = payload.copy()
     now = datetime.now(timezone.utc)
     expire = now + expires_delta
