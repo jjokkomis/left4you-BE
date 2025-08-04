@@ -1,11 +1,12 @@
 import os, httpx, jwt
 from data import auth as data
+from utils.JWT import create_access_token
 
-KAKAO_CLIENT_ID     = os.getenv("KAKAO_CLIENT_ID")
-KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")
-KAKAO_REDIRECT_URI  = os.getenv("KAKAO_REDIRECT_URI")
-JWT_SECRET          = os.getenv("JWT_SECRET")
-JWT_ALGORITHM       = os.getenv("JWT_ALGORITHM", "HS256")
+KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID")
+KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET")
+KAKAO_REDIRECT_URI = os.getenv("KAKAO_REDIRECT_URI")
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 async def exchange_kakao_token(code: str) -> dict:
     data = {
@@ -36,30 +37,22 @@ async def fetch_kakao_profile(access_token: str) -> dict:
         return r.json()
 
 async def login_or_signup_kakao(code: str) -> dict:
-    # 1) 인가 코드 → 카카오 access_token
     tokens  = await exchange_kakao_token(code)
-    # 2) access_token → 프로필
     profile = await fetch_kakao_profile(tokens["access_token"])
+    kakao_id = profile["id"]
+    kakao_acc = profile.get("kakao_account", {}).get("profile", {}) or profile.get("properties", {})
+    nickname = kakao_acc.get("nickname")
+    profile_img = kakao_acc.get("profile_image_url")
 
-    kakao_id    = profile["id"]
-    kakao_acc   = profile.get("kakao_account", {}).get("profile", {}) \
-                  or profile.get("properties", {})
-    nickname    = kakao_acc.get("nickname", "")
-    profile_img = kakao_acc.get("profile_image_url", "")
-
-    # 3) Supabase에서 조회/생성 (dict or None 반환)
     user = data.get_user_by_kakao_id(kakao_id)
     if user is None:
         user = data.create_user(kakao_id, nickname, profile_img)
 
-    # 4) JWT 발급 (payload에 user_id만 담음)
     payload   = { "user_id": user["id"] }
-    jwt_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    jwt_token = create_access_token(payload)
 
-    # 5) 토큰과 유저 정보를 함께 반환
     return {
         "access_token": jwt_token,
-        "token_type":   "bearer",
         "user": {
             "id":      user["id"],
             "name":    user["name"],

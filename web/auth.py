@@ -1,7 +1,6 @@
 import os
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
 from service import auth
 
 router = APIRouter()
