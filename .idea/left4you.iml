@@ -7,4 +7,7 @@
     <orderEntry type="jdk" jdkName="Python 3.12 (left4you-BE)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
+  <component name="PackageRequirementsSettings">
+    <option name="versionSpecifier" value="버전 지정 안 함" />
+  </component>
 </module>
