@@ -1,16 +1,17 @@
 from pydantic import BaseModel
 
-class Coordinates(BaseModel):
-    lat: float
-    lng: float
-
-class Content(BaseModel):
-    coordA: Coordinates
-    coordB: Coordinates
-
-class CourseCreateRequest(BaseModel):
-    maker_id: str
+class Course(BaseModel):
+    maker_id: int
     name: str
-    content: Content
+    content: str
     rating: int
-    message: str
+
+class CoursePlace(BaseModel):
+    course_id: int
+    place_name: str
+    latitude: float
+    longitude: float
+
+class CreateCourseRequest(BaseModel):
+    course: Course
+    place: CoursePlace

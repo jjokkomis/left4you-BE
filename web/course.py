@@ -1,37 +1,32 @@
-from fastapi import APIRouter, Body
-from model.course import CourseCreateRequest
-from service import course as service
+from fastapi import APIRouter
 from data.course import list_courses as db
+from model.course import CreateCourseRequest
+from data.course import CourseData;
 
 router = APIRouter(prefix="/course")
 
 @router.post("/create")
-def create_course(request: CourseCreateRequest):
-    coordA = request.content.coordA
-    coordB = request.content.coordB
+def create_course_endpoint(request: CreateCourseRequest):
+    course = request.course
+    place = request.place
 
-    result = service.create_course(
-        request.maker_id,
-        request.name,
-        coordA,
-        coordB,
-        request.rating,
-        request.message
+    course_data = CourseData()
+
+    course_result = course_data.create_course(
+        maker_id=course.maker_id,
+        name=course.name,
+        content=course.content,
+        rating=course.rating
     )
 
-    if result.get("success"):
-        return {
-            "success": True,
-            "courseId": result["course_id"]
-        }
-    else:
-        return {
-            "success": False,
-            "message": result.get("message", "Unknown error")
-        }
-
+    course_place_result = course_data.create_course_place(
+        course_id=course_result[0]["id"],
+        place_name=place.place_name,
+        latitude=place.latitude,
+        longitude=place.longitude
+    )
 
 @router.get("/list")
 def list_courses():
     data = db()
-    return data
+    return {"success": True, "courses": data}

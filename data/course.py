@@ -3,34 +3,44 @@ import os
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
 
-def create_course(maker_id, name, coordA, coordB, rating, message):
-    response = supabase.table("course").insert({
-        "maker_id": maker_id,
-        "name": name,
-        "content": {
-            "coordA": coordA.dict(),
-            "coordB": coordB.dict()
-        },
-        "rating": rating,
-        "message": message
-    }).execute()
+class CourseData:
+    def create_course(self, maker_id: str, name: str, content: str, rating: int):
+        response = (
+            supabase
+            .table("course")
+            .insert({
+                "maker_id": maker_id,
+                "name": name,
+                "content": content,
+                "rating": rating,
+            })
+            .execute()
+        )
+        return response.data
 
-    if response.data:
-        return {"success": True, "course_id": response.data[0]["id"]}
-    else:
-        return {"success": False, "message": "데이터 삽입 실패"}
+    def create_course_place(self, course_id: int, place_name: str, latitude: float, longitude: float):
+        response = (
+            supabase
+            .table("course_place")
+            .insert({
+                "course_id": course_id,
+                "seq": 1,
+                "place_name": place_name,
+                "latitude": latitude,
+                "longitude": longitude,
+            })
+            .execute()
+        )
+        return response.data
+
 
 def list_courses():
     response = (
         supabase
-        .table("course")
-        .select("name, content, maker_id")
-        .order("created_at", desc=True)
-        .limit(10)
+        .table("course_with_place")
+        .select("*")
+        .order("course_id", desc=True)
+        .limit(1)
         .execute()
     )
-
-    if response.data:
-        return {"success": True, "courses": response.data}
-    else:
-        return {"success": True, "courses": []}
+    return response.data
