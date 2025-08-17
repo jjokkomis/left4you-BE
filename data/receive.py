@@ -1,4 +1,3 @@
-# data/receive.py
 import os
 from supabase import create_client
 from typing import Dict, Any, List, Set
@@ -67,3 +66,42 @@ def load_rating_by_course_ids(course_ids: List[int]) -> Dict[int, tuple]:
 def is_claimed(user_id:int, course_id:int)->bool:
     rows = (supabase.table(GIFT_TABLE).select("id").eq("recipient_id",user_id).eq("course_id",course_id).execute().data or [])
     return len(rows)>0
+
+def insert_gift(recipient_id: int, course_id: int) -> None:
+    supabase.table(GIFT_TABLE).insert({
+        "recipient_id": recipient_id,
+        "course_id": course_id
+    }).execute()
+
+def course_exists(course_id: int) -> bool:
+    rows = (supabase.table(COURSE_TABLE)
+            .select("id").eq("id", course_id).limit(1).execute().data or [])
+    return len(rows) > 0
+
+
+def list_all_gifts(user_id: int) -> List[Dict[str, Any]]:
+    # 내가 받은 코스 전부 (최신순)
+    rows = (supabase.table(GIFT_TABLE)
+            .select("id, course_id, created_at")
+            .eq("recipient_id", user_id)
+            .order("created_at", desc=True)
+            .execute().data or [])
+
+    course_ids = list({int(r["course_id"]) for r in rows if r.get("course_id") is not None})
+    courses = load_courses(course_ids)  # { id: {name, content, created_at} }
+    ratings = load_rating_by_course_ids(course_ids)  # { id: (avg, cnt) }
+
+    out: List[Dict[str, Any]] = []
+    for g in rows:
+        cid = int(g["course_id"])
+        c = courses.get(cid, {})
+        avg, cnt = ratings.get(cid, (None, 0))
+        out.append({
+            "gift_id": int(g["id"]),
+            "course_id": cid,
+            "claimed_at": g.get("created_at"),
+            "course_name": c.get("name"),
+            "rating_avg": avg,
+            "rating_count": cnt,
+        })
+    return out

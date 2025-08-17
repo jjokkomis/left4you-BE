@@ -1,14 +1,7 @@
-# service/receive.py
 from typing import Dict, Any, List, Optional, Set, Tuple
 import math
 from fastapi import HTTPException
 from data import receive as data
-
-# ===== 0) 지역 매핑 (한글 → 코드) =====
-REGION_TO_CITY = {
-    "서울":"SEOUL","부산":"BUSAN","대구":"DAEGU","인천":"INCHEON","광주":"GWANGJU",
-    "제주":"JEJU","대전":"DAEJEON","경기":"GYEONGGI","울산":"ULSAN","세종":"SEJONG"
-}
 
 # ===== 1) 점수 가중치 =====
 W_CITY, W_THEME, W_EMOTION, W_TIME, W_WALK, W_QUALITY = 2.0, 1.5, 1.2, 0.7, 0.6, 0.3
@@ -23,8 +16,8 @@ CITY_BBOX = {
     "GWANGJU": (35.05, 35.25, 126.70, 127.05),
     "ULSAN":   (35.40, 35.70, 129.20, 129.50),
     "SEJONG":  (36.45, 36.65, 127.20, 127.40),
-    "GYEONGGI":(36.80, 38.30, 126.30, 127.60),  # 동쪽 축소
-    "GANGWON": (37.00, 38.60, 127.60, 129.60),  # 서쪽부터 시작
+    "GYEONGGI":(36.80, 38.30, 126.30, 127.60),
+    "GANGWON": (37.00, 38.60, 127.60, 129.60),
     "JEJU":    (33.10, 33.60, 126.10, 126.95),
 }
 
@@ -40,11 +33,15 @@ def _compute_distance_km(places: List[Dict[str,Any]]) -> float:
     ps = sorted(places, key=lambda x: x["seq"])
     for i in range(len(ps)-1):
         a, b = ps[i], ps[i+1]
-        if a["latitude"] and a["longitude"] and b["latitude"] and b["longitude"]:
-            total += _haversine(a["latitude"], a["longitude"], b["latitude"], b["longitude"])
+        if a.get("latitude") is None or a.get("longitude") is None:
+            continue
+        if b.get("latitude") is None or b.get("longitude") is None:
+            continue
+        total += _haversine(a["latitude"], a["longitude"], b["latitude"], b["longitude"])
     return round(total, 2)
 
-def _kw(name: str) -> str: return (name or "").lower()
+def _kw(name: Optional[str]) -> str:
+    return (name or "").lower()
 
 def _bucket_minutes(place_name: str) -> Tuple[int,int]:
     n = _kw(place_name)
@@ -71,11 +68,10 @@ def _derive_features(course: Dict[str,Any], places: List[Dict[str,Any]]) -> Dict
     if any(k in full_text for k in ["야경","night","밤","루프탑","bar","펍","pub","분수"]):
         time_pref = "NIGHT"
 
-    # centroid → bbox
     city = None
     if places:
-        lat = sum(p["latitude"] for p in places)/len(places)
-        lon = sum(p["longitude"] for p in places)/len(places)
+        lat = sum((p.get("latitude") or 0) for p in places)/len(places)
+        lon = sum((p.get("longitude") or 0) for p in places)/len(places)
         for c,(la,lb,lo,hi) in CITY_BBOX.items():
             if la <= lat <= lb and lo <= lon <= hi:
                 city = c; break
@@ -94,7 +90,7 @@ def _walk_sim(user: Optional[str], course: Optional[str]) -> float:
 def _norm(v: Optional[str]) -> Optional[str]:
     return None if v is None else v.strip().upper()
 
-# ===== 4) 테마/감정 간단 추출 (이름/콘텐츠/장소명 키워드) =====
+# ===== 4) 테마/감정 간단 추출 =====
 THEME_RULES = {
   "ART":["미술관","박물관","gallery","전시","갤러리"],
   "LIBRARY":["도서관","서점","book"],
@@ -142,7 +138,6 @@ def _score(traits: Dict[str,Any], derived: Dict[str,Any], themes:Set[str], emoti
 def _short_area(name:str)->str:
     if not name: return ""
     s = name.replace("한강공원","").replace("해변","").replace("공원","").replace("미술관","").replace("박물관","").strip()
-    # 공백 전 첫 토큰 우선
     return s.split()[0] if " " in s and s.split()[0] else (s or name)
 
 def _build_location_label(places: List[Dict[str,Any]])->str:
@@ -152,7 +147,6 @@ def _build_location_label(places: List[Dict[str,Any]])->str:
     end = _short_area(ps[-1]["place_name"])
     if start and end and start!=end:
         return f"{start} -> {end}"
-    # 단일/동일이면 유형 라벨로
     return "공원" if any("공원" in p["place_name"] for p in ps) else start or end
 
 def _describe_place(place_name:str, derived:Dict[str,Any])->str:
@@ -170,7 +164,6 @@ def _describe_place(place_name:str, derived:Dict[str,Any])->str:
         lines += ["야경 감상 포인트 체크"]
     if not lines:
         lines = ["가볍게 둘러보기", "근처 카페/편의시설 이용"]
-    # 숫자 정보 보강(짧게)
     dist = derived.get("distance_km"); dur = derived.get("duration_min")
     tail = []
     if dist: tail.append(f"예상 이동 {dist}km")
@@ -180,7 +173,6 @@ def _describe_place(place_name:str, derived:Dict[str,Any])->str:
 
 def _gift_from(course:Dict[str,Any], places:List[Dict[str,Any]], derived:Dict[str,Any])->Dict[str,Any]:
     ps = sorted(places, key=lambda x:x["seq"])
-    # 3 스테이지 선택: 처음/중간/마지막 (중복 방지)
     idxs = list({0, len(ps)//2, len(ps)-1}) if len(ps)>=3 else list(range(len(ps)))
     idxs = sorted(set(i for i in idxs if 0<=i<len(ps)))[:3]
 
@@ -188,41 +180,43 @@ def _gift_from(course:Dict[str,Any], places:List[Dict[str,Any]], derived:Dict[st
     location_label = _build_location_label(ps)
     for i,idx in enumerate(idxs):
         p = ps[idx]
-        # 첫 스테이지는 경로 라벨, 나머지는 유형 또는 지명
         if i==0:
             loc = location_label or _short_area(p["place_name"])
         else:
             loc = ("공원" if "공원" in p["place_name"] else _short_area(p["place_name"]))
-        stages.append({
+        stage = {
             "location": loc,
             "place": p["place_name"],
-            "description": _describe_place(p["place_name"], derived),
-            "latitude": p.get("latitude"),
-            "longitude": p.get("longitude")
-        })
+            "description": _describe_place(p["place_name"], derived)
+        }
+        if p.get("latitude") is not None and p.get("longitude") is not None:
+            stage["latitude"] = p["latitude"]
+            stage["longitude"] = p["longitude"]
+        stages.append(stage)
 
-    # 타이틀 생성(간단 템플릿)
     title_bits = []
     if any("공원" in x["place_name"] or "한강" in x["place_name"] for x in ps): title_bits.append("공원")
     if derived.get("time")=="NIGHT": title_bits += ["야경"]
     if derived.get("walk_type")=="EASY": title_bits.append("힐링")
     title = " & ".join(dict.fromkeys(title_bits)) + " 코스" if title_bits else course.get("name") or "추천 코스"
 
-    return {"name": course.get("name") or title, "courses": stages}
+    return {"courseId": course["id"], "name": course.get("name") or title, "courses": stages}
 
-# ===== 7) 메인 =====
-def recommend_giftdata(user_id: int, city: Optional[str], region: Optional[str]) -> Optional[Dict[str,Any]]:
-    # 7.1 입력 정규화 (region 한글 → city 코드)
-    if not city and region:
-        city = REGION_TO_CITY.get(region)
+# ===== 7) 추천(Top-1) =====
+def recommend_giftdata(
+    user_id: int,
+    city: str,
+    exclude_course_id: Optional[int] = None
+) -> Optional[Dict[str,Any]]:
     if not city:
-        raise HTTPException(status_code=400, detail="city_or_region_required")
+        raise HTTPException(status_code=400, detail="city_required")
+    city = city.upper()
 
     bbox = CITY_BBOX.get(city)
     if not bbox:
         raise HTTPException(status_code=400, detail="unknown_city")
 
-    # 7.2 설문 로드
+    # 설문 → traits
     survey = data.load_survey(user_id)
     traits = {
         "CITY": city,
@@ -231,9 +225,10 @@ def recommend_giftdata(user_id: int, city: Optional[str], region: Optional[str])
         "TIME": _norm(next((r["value"] for r in survey if r["type"]=="TIME"), None)),
         "WALK_TYPE": _norm(next((r["value"] for r in survey if r["type"]=="WALK_TYPE"), None)),
     }
-    if traits["WALK_TYPE"] == "ESAY": traits["WALK_TYPE"] = "EASY"  # 오타 보정
+    if traits["WALK_TYPE"] == "ESAY":
+        traits["WALK_TYPE"] = "EASY"
 
-    # 7.3 후보(도시 bbox & 이미 받은 코스 제외)
+    # 후보(도시 bbox & 이미 받은 코스 제외)
     lat_min, lat_max, lon_min, lon_max = bbox
     candidate_ids = data.find_candidate_course_ids_by_city_bbox(
         user_id=user_id, lat_min=lat_min, lat_max=lat_max, lon_min=lon_min, lon_max=lon_max
@@ -245,23 +240,55 @@ def recommend_giftdata(user_id: int, city: Optional[str], region: Optional[str])
     places_map = data.load_places_by_course_ids(candidate_ids)
     rating_map = data.load_rating_by_course_ids(candidate_ids)
 
-    best_id, best_score, best_tie, best_pack = None, -1e9, (-1,-1), None
+    best_id, best_score, best_tie, best_pack = None, -1e9, (-1,""), None
     for cid in candidate_ids:
+        if exclude_course_id and cid == exclude_course_id:
+            continue
+
         course = courses.get(cid); places = places_map.get(cid, [])
-        if not course or not places: continue
+        if not course or not places:
+            continue
 
         derived = _derive_features(course, places)
-        # 도시 최종 검증(요청 도시와 다르면 제외)
-        if derived.get("city") != city: continue
+        if derived.get("city") != city:
+            continue # 도시 안맞으면 추천 X -> 그 도시가 없으면 어케할지 생각해봐야할듯함
 
         themes, emotions = _extract_themes_emotions(course, places)
         avg, cnt = rating_map.get(cid, (None, 0))
         s = _score(traits, derived, themes, emotions, avg, cnt)
-        tiebreak = (cnt or 0, int(course.get("created_at_ts", 0)) if isinstance(course.get("created_at_ts",0), int) else 0)
+        tie = (cnt or 0, course.get("created_at") or "")
 
-        if (s, tiebreak) > (best_score, best_tie):
-            best_id, best_score, best_tie = cid, s, tiebreak
-            giftdata = _gift_from(course, places, derived)
-            best_pack = giftdata
+        if (s, tie) > (best_score, best_tie):
+            best_id, best_score, best_tie = cid, s, tie
+            best_pack = _gift_from(course, places, derived)
 
     return best_pack
+
+# ===== 8) 코스 받기(저장) =====
+def claim_course(
+    user_id: int,
+    city: str,
+    course_id: Optional[int] = None
+) -> Dict[str, Any]:
+    if not city:
+        raise HTTPException(status_code=400, detail="city_required")
+    city = city.upper()
+
+    if course_id is None:
+        gift = recommend_giftdata(user_id=user_id, city=city)
+        if gift is None:
+            raise HTTPException(status_code=404, detail="no_recommendation")
+        course_id = gift["courseId"]
+
+    if not data.course_exists(course_id):
+        raise HTTPException(status_code=404, detail="course_not_found")
+
+    if data.is_claimed(user_id, course_id):
+        raise HTTPException(status_code=409, detail="already_claimed")
+
+    data.insert_gift(recipient_id=user_id, course_id=course_id)
+    return {"claimed": True, "course_id": course_id}
+
+
+def list_all_my_gifts(user_id: int) -> List[Dict[str, Any]]:
+    return data.list_all_gifts(user_id=user_id)
