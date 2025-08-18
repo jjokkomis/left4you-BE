@@ -1,9 +1,6 @@
-from http.client import responses
-
 from supabase import create_client
 import os
 import requests
-from model.course import ReviewResponse, ReviewRequest
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
 
@@ -81,15 +78,18 @@ class CourseData:
 
         return course
 
-    def review_courses(self, course_id: int, content: str, score: int):
-        supabase.table("review").insert({
-            "course_id": course_id,
-            "content": content,
-            "score": score,
-        }).execute()
+    def review_courses(self, course_id: int, author_id: int, content: str, score: int):
+        result = supabase.table("review").upsert(
+            {
+                "course_id": course_id,
+                "author_id": author_id,
+                "content": content,
+                "score": score
+            },
+            on_conflict="author_id"
+        ).execute()
 
-        response = supabase.table("review").select("*").eq("course_id", course_id).execute()
-        return response.data
+        return result.data
 
     def get_latest_review(self, course_id: int):
         response = (

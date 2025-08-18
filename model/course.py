@@ -29,12 +29,14 @@ class CreateReviewRequest(BaseModel):
     title: str
     body: str
     score: int
+    author_id: int
 
 class ReviewRequest(BaseModel):
     course_id: int
     title: str
     body: str
     score: int
+    author_id: int
 
 class ReviewResponse(BaseModel):
     id: int
@@ -42,3 +44,4 @@ class ReviewResponse(BaseModel):
     title: str
     body: str
     score: int
+    author_id: int

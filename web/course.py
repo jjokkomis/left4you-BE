@@ -44,7 +44,7 @@ def get_latest_review(course_id: int):
     latest_review = course_data.get_latest_review(course_id)
     return {"success": True, "latestReview": latest_review}
 
-# 리뷰 작성
+# 리뷰 작성 + 업데이트
 @router.post("/{course_id}")
 def add_course_review(course_id: int, request: CreateReviewRequest = Body(...)):
     full_content = f"{request.title}\n{request.body}"
@@ -52,5 +52,6 @@ def add_course_review(course_id: int, request: CreateReviewRequest = Body(...)):
         course_id=course_id,
         content=full_content,
         score=request.score,
+        author_id=request.author_id
     )
     return {"success": True, "reviews": new_reviews}
