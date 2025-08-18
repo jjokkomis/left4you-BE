@@ -16,12 +16,6 @@ class CreateCourseRequest(BaseModel):
     course: Course
     place: CoursePlace
 
-class UpdateCourseRequest(BaseModel):
-    course_id: int
-    title: str
-    body: str
-    rating: int
-
 class CourseRequest(BaseModel):
     maker_id: int
     name: str
@@ -30,3 +24,21 @@ class CourseRequest(BaseModel):
     place_name: str
     latitude: float
     longitude: float
+
+class CreateReviewRequest(BaseModel):
+    title: str
+    body: str
+    score: int
+
+class ReviewRequest(BaseModel):
+    course_id: int
+    title: str
+    body: str
+    score: int
+
+class ReviewResponse(BaseModel):
+    id: int
+    course_id: int
+    title: str
+    body: str
+    score: int

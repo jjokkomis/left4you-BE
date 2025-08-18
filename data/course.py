@@ -1,6 +1,9 @@
+from http.client import responses
+
 from supabase import create_client
 import os
 import requests
+from model.course import ReviewResponse, ReviewRequest
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
 
@@ -42,42 +45,19 @@ class CourseData:
         }).execute()
         return response.data
 
-    def list_review_courses(self, limit: int = 20):
-        response = (
-            supabase
-            .table("course")
-            .select("*")
-            .order("id", desc=True)
-            .range(0, limit - 1)
-            .execute())
+    def list_courses(self):
+        courses_resp = supabase.table("course").select("*").order("created_at", desc=True).limit(10).execute()
+        courses = courses_resp.data or []
 
-        courses = response.data or []
+        places_resp = supabase.table("course_place").select("*").execute()
+        places = places_resp.data or []
 
         for course in courses:
-            response = (
-                supabase
-                .table("course_place")
-                .select("*")
-                .eq("course_id", course["id"])
-                .order("seq")
-                .execute())
-            course["places"] = response.data or []
+            course["places"] = [p for p in places if p["course_id"] == course["id"]]
 
         return courses
 
-    def update_course(self, course_id: int, content: str, rating: int):
-        response = (
-            supabase
-            .table("course")
-            .update({"content": content, "rating": rating})
-            .eq("id", course_id)
-            .execute()
-        )
-
-        updated_course = response.data[0] if response.data else None
-
-        return updated_course
-
+    # 만들기 페이지에서의 list 조회
     def get_course_by_id(self, course_id: int):
         resp = (
             supabase
@@ -101,13 +81,23 @@ class CourseData:
 
         return course
 
-    def list_gift_course(self, course_id: int):
-        resp = (
+    def review_courses(self, course_id: int, content: str, score: int):
+        supabase.table("review").insert({
+            "course_id": course_id,
+            "content": content,
+            "score": score,
+        }).execute()
+
+        response = supabase.table("review").select("*").eq("course_id", course_id).execute()
+        return response.data
+
+    def get_latest_review(self, course_id: int):
+        response = (
             supabase
-            .table("course_gift")
+            .table("review")
             .select("*")
             .eq("course_id", course_id)
+            .order("id", desc=True)
             .execute()
         )
-
-        return resp.data
+        return response.data[0] if response.data else None

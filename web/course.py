@@ -1,6 +1,7 @@
 from fastapi import APIRouter
-from model.course import UpdateCourseRequest, CourseRequest
+from model.course import CourseRequest, CreateReviewRequest, ReviewResponse
 from data.course import CourseData
+from fastapi import Body, Query
 
 router = APIRouter(prefix="/course")
 course_data = CourseData()
@@ -25,40 +26,31 @@ def create_course(request: CourseRequest):
 
     return { "success": True, "course": course_result, "place": place_result, "tour_item": tour_item }
 
-# 최신 코스 1개 조회
+# 내가 만든 코스 조회
 @router.get("/list")
-def get_latest_course():
-    data = course_data.list_review_courses(limit=1)
+def list_courses():
+    data = course_data.list_courses()
     return {"success": True, "courses": data}
 
-# 리뷰 코스 조회
-@router.get("/review")
-def get_review_courses():
-    data = course_data.list_review_courses(limit=20)
-    return {"success": True, "courses": data}
-
-# 코스 리뷰 수정
-@router.put("/update")
-def update_course(request: UpdateCourseRequest):
-    full_content = f"{request.title}\n{request.body}"
-
-    updated_course = course_data.update_course(
-        course_id=request.course_id,
-        content=full_content,
-        rating=request.rating
-    )
-
-    return {"success": True, "course": updated_course}
-
-# 코스 단일 조회
+# 코스 조회 (리뷰 페아지로 이동)
 @router.get("/{course_id}")
 def get_course(course_id: int):
     course = course_data.get_course_by_id(course_id)
-
     return {"success": True, "course": course}
 
-# 선물 받은 코스 조회
-@router.get("/gift/{course_id}")
-def list_course_gift(course_id: int):
-    course = course_data.list_gift_course(course_id)
-    return {"success": True, "courses": course}
+# 가장 최근 내가 적은 리뷰 띄우기
+@router.get("/{course_id}/reviews/latest")
+def get_latest_review(course_id: int):
+    latest_review = course_data.get_latest_review(course_id)
+    return {"success": True, "latestReview": latest_review}
+
+# 리뷰 작성
+@router.post("/{course_id}")
+def add_course_review(course_id: int, request: CreateReviewRequest = Body(...)):
+    full_content = f"{request.title}\n{request.body}"
+    new_reviews = course_data.review_courses(
+        course_id=course_id,
+        content=full_content,
+        score=request.score,
+    )
+    return {"success": True, "reviews": new_reviews}
