@@ -58,7 +58,7 @@ def list_my_gifts(user_id: int = Depends(JWT.get_current_user_id)):
         "course_name": "한강 야경 산책",
         "rating_avg": 4.3,
         "rating_count": 12
-      },
+      }
       ...
     ]
     """

@@ -1,14 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from model.course import CourseRequest, CreateReviewRequest
 from data.course import CourseData
-from fastapi import Body, Query
 
 router = APIRouter(prefix="/course")
 course_data = CourseData()
 
 @router.post("/create")
 def create_course(request: CourseRequest):
-    course_result, tour_item = course_data.create_course(
+    course_result = course_data.create_course(
         maker_id=request.maker_id,
         name=request.name,
         content=request.content,
@@ -21,7 +20,7 @@ def create_course(request: CourseRequest):
         latitude=request.latitude,
         longitude=request.longitude
     )
-    return { "success": True, "course": course_result, "place": place_result, "tour_item": tour_item }
+    return {"success": True, "course": course_result, "place": place_result}
 
 @router.get("/list")
 def list_courses(user_id: int):

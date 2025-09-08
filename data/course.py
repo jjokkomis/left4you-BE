@@ -1,35 +1,17 @@
 from supabase import create_client
 import os
-import requests
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
 
 class CourseData:
     def create_course(self, maker_id: int, name: str, content: str, rating: int):
-        TOUR_API_KEY = os.getenv("TOUR_API_KEY")
-        url = "http://api.visitkorea.or.kr/openapi/service/rest/KorService/areaBasedList"
-        params = {
-            "ServiceKey": TOUR_API_KEY,
-            "MobileOS": "ETC",
-            "MobileApp": "GiftTrip",
-            "_type": "json",
-            "areaCode": 8,
-            "sigunguCode": 1,
-            "contentTypeId": 12,
-            "numOfRows": 1
-        }
-        resp = requests.get(url, params=params)
-        resp.raise_for_status()
-        data_json = resp.json()
-        tour_item = data_json.get("response", {}).get("body", {}).get("items", {}).get("item", {})
-
         response = supabase.table("course").insert({
             "maker_id": maker_id,
             "name": name,
             "content": content,
             "rating": rating,
         }).execute()
-        return response.data, tour_item
+        return response.data
 
     def create_course_place(self, course_id: int, place_name: str, latitude: float, longitude: float, seq: int = 1):
         response = supabase.table("course_place").insert({
