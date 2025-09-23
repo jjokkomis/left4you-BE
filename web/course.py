@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Body
 from model.course import CourseRequest, CreateReviewRequest
 from data.course import CourseData
+from typing import Dict, Any
+from fastapi import APIRouter, Path, HTTPException
 
 router = APIRouter(prefix="/course")
 course_data = CourseData()
@@ -47,3 +49,10 @@ def add_course_review(course_id: int, request: CreateReviewRequest = Body(...)):
         score=request.score
     )
     return {"success": True, "reviews": new_reviews}
+
+@router.get("/receive/{course_id}")
+def get_course(course_id: int = Path(..., description="코스 ID")):
+    course = course_data.get_course_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="코스를 찾을 수 없습니다.")
+    return course

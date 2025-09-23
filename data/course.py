@@ -1,5 +1,6 @@
 from supabase import create_client
 import os
+from typing import Dict, Any, List, Optional
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
 
@@ -79,6 +80,44 @@ class CourseData:
         reviews_resp = supabase.table("review").select("*").eq("course_id", course_id).order("created_at", desc=True).execute()
         return reviews_resp.data or []
 
+    def get_course_by_id(cls, course_id: int):
+        # 코스 가져오기
+        res = supabase.table("course").select("*").eq("id", course_id).single().execute()
+        if res.data is None:
+            return None
+        course_data = res.data
+
+        places_res = supabase.table("course_place") \
+            .select("*") \
+            .eq("course_id", course_id) \
+            .order("seq") \
+            .execute()
+
+        places_data = []
+        if places_res.data:
+            for r in places_res.data:
+                places_data.append({
+                    "id": r["id"],
+                    "place": r.get("place_name"),
+                    "location": f'{r.get("latitude")}, {r.get("longitude")}',
+                    "description": r.get("description") or "",
+                })
+
+        return {
+            "id": course_data["id"],
+            "name": course_data.get("name"),
+            "courses": places_data,
+        }
+
     def get_latest_review(self, course_id: int, user_id: int):
-        response = supabase.table("review").select("*").eq("author_id", user_id).eq("course_id", course_id).order("created_at", desc=True).limit(1).execute()
-        return response.data[0] if response.data else None
+            resp = (
+                supabase.table("review")
+                .select("*")
+                .eq("course_id", course_id)
+                .eq("author_id", user_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            reviews = resp.data or []
+            return reviews[0] if reviews else None
